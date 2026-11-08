@@ -42,4 +42,4 @@ data/
 
 `pnpm check` validates the folder.
 
-The dev server only listens on this machine. To open it from elsewhere (e.g. a VM's forwarded port), put `INSPO_HOST=0.0.0.0` in `.env.local`. The app has no login, so only do that on a network you trust.
+The app runs directly on macOS or Linux, and the dev server only listens on your own machine. To open it from another device, put `INSPO_HOST=0.0.0.0` in `.env.local`. The app has no login, so only do that on a network you trust.

@@ -1,12 +1,12 @@
 # Security review
 
-Reviewed 2026-11-08, then re-rated against the environment the app actually runs in, and fixed. This is a personal, local-first tool; the review asks how it could be abused anyway.
+Reviewed 2026-11-08, then re-rated against a typical installation, and fixed. This is a personal, local-first tool; the review asks how it could be abused anyway.
 
 ## Environment assumed
 
 - **One user.** No shared machine, no other accounts.
-- **The app runs in a Linux VM behind NAT,** reached from the host through forwarded ports. The forward is the only way in, and it may be exposed beyond the host depending on its bind address.
-- **You browse the web on the same host while the dev server runs.** That makes cross-site requests to the forwarded `localhost` port the realistic remote attack. Current Chrome and Edge also ask permission before a public site may call a local address (Local Network Access); Firefox and Safari don't yet.
+- **The app runs directly on the user's computer** (macOS or Linux), often a laptop that joins untrusted networks such as café or office Wi-Fi.
+- **You browse the web on the same computer while the dev server runs.** That makes cross-site requests to `localhost` the realistic remote attack. Current Chrome and Edge also ask permission before a public site may call a local address (Local Network Access); Firefox and Safari don't yet.
 - **Claude Code sessions process untrusted text** (posts, pages, the capture document) and may run in a mode that auto-approves commands.
 - **`data/` is personal.** It is now fully gitignored.
 
@@ -22,9 +22,9 @@ Reviewed 2026-11-08, then re-rated against the environment the app actually runs
 
 ## Findings
 
-| # | Finding | First rating | In this environment | Status |
+| # | Finding | First rating | Typical install | Status |
 | --- | --- | --- | --- | --- |
-| 1 | API without login listened on every interface | High | Medium | **Fixed** |
+| 1 | API without login listened on every interface | High | High | **Fixed** |
 | 2 | Any website could create entries, add tags, upload files | High | Medium | **Fixed** |
 | 3 | Uploaded SVGs served with scripts enabled | Medium | Low | **Fixed** |
 | 4 | Privacy guard bypassable by prompt injection | Medium | Medium | **Hardened**; residual risk |
@@ -36,17 +36,15 @@ Reviewed 2026-11-08, then re-rated against the environment the app actually runs
 | 10 | `entry put` renamed files before validating paths | Low | Low | **Fixed** |
 | 11 | CLI and server could overwrite each other's writes | Low | Info | Accepted |
 | 12 | Third-party requests reveal your IP (Google Fonts) | Low | Low | Accepted (your choice of font) |
-| 13 | Personal data committed to git | Info | Low | **Fixed** going forward; see note |
+| 13 | Personal data committed to git | Info | Low | **Fixed** |
 
-### 1. Exposure (High → Medium, fixed)
+### 1. Exposure (High, fixed)
 
-**Why lower:** the VM sits behind NAT, so only the forwarded port reaches it, not the whole LAN. It is still reachable from the network if the host-side forward binds to all interfaces.
+**Why it stays High:** on a laptop on shared Wi-Fi, anyone on that network could read and change the gallery while the server ran.
 
-**Fix:** the server now listens on `127.0.0.1` by default. Wider binding is a per-machine opt-in: `INSPO_HOST=0.0.0.0` in the gitignored `.env.local`, which this VM uses for its port forward.
+**Fix:** the server now listens on `127.0.0.1` by default. Reaching it from other devices is a per-machine opt-in: `INSPO_HOST=0.0.0.0` in the gitignored `.env.local`. With that set, the exposure returns, so use it only on a trusted network. If the app runs in a VM or container, point the port forward at `127.0.0.1` on the host side.
 
-**Verified:** without `.env.local` the server prints only `127.0.0.1`, and the LAN address refuses connections.
-
-**Still on you:** in the VM's port-forward rule, set the host IP to `127.0.0.1` so the forward isn't reachable from other machines.
+**Verified:** by default the server prints only `127.0.0.1`, and the network address refuses connections.
 
 ### 2. Cross-site request forgery (High → Medium, fixed)
 
@@ -122,11 +120,9 @@ One user rarely runs the CLI and saves in the app at the same instant. Both writ
 - Google Fonts (Inter) sees your IP address on each app load. Self-host the font if that matters.
 - Source sites (X, `twimg.com`) see your IP address during `ingest`; they never see any identity.
 
-### 13. Personal data in git (fixed going forward)
+### 13. Personal data in git (fixed)
 
-`data/` is now gitignored entirely, and a fresh clone starts with an empty gallery. **`data/gallery.json` is still tracked and is in existing commits:**
-- untrack it with `git rm --cached data/gallery.json`;
-- removing it from the history pushed to GitHub needs a history rewrite.
+`data/` is gitignored entirely, and a fresh clone starts with an empty gallery. `data/gallery.json` was removed from every commit with a history rewrite; no commit contains any file under `data/`.
 
 ## Controls in place
 
