@@ -1,177 +1,152 @@
 # Security review
 
-Reviewed 2026-11-08 against the repository at commit `53cfefe` plus the working tree. This is a personal, local-first tool; the review asks how it could be abused anyway.
+Reviewed 2026-11-08, then re-rated against the environment the app actually runs in, and fixed. This is a personal, local-first tool; the review asks how it could be abused anyway.
+
+## Environment assumed
+
+- **One user.** No shared machine, no other accounts.
+- **The app runs in a Linux VM behind NAT,** reached from the host through forwarded ports. The forward is the only way in, and it may be exposed beyond the host depending on its bind address.
+- **You browse the web on the same host while the dev server runs.** That makes cross-site requests to the forwarded `localhost` port the realistic remote attack. Current Chrome and Edge also ask permission before a public site may call a local address (Local Network Access); Firefox and Safari don't yet.
+- **Claude Code sessions process untrusted text** (posts, pages, the capture document) and may run in a mode that auto-approves commands.
+- **`data/` is personal.** It is now fully gitignored.
 
 ## Method
 
-- Code review of the server (`server/`), scripts (`scripts/`), the Claude Code harness (`.claude/`) and the supply-chain tooling.
-- Live probes against a dev server running on a throwaway copy of `data/` (cross-origin requests, Host-header rebinding, LAN access, path traversal, uploads).
-- The privacy guard tested with exfiltration-shaped commands (fed to the hook, not executed).
-- `pnpm audit` (no known vulnerabilities), plus OSV.dev/NVD audits of yt-dlp 2026.10.26 and ffmpeg 9.0.2.
-
-## What's worth protecting
-
-| Asset | Why it matters |
-| --- | --- |
-| `data/gallery.json`, `data/media/` | The collection itself. Losing or silently altering it is the main harm. |
-| The user's identity | Email, name, username, cookies. The harness is meant never to send them to a site. |
-| The machine | Anything that runs code: ffmpeg on untrusted video, yt-dlp, Claude Code with shell access. |
-| The capture document | Edited by Claude Code through the Docs connector. |
+- Code review of `server/`, `scripts/`, `.claude/` and the supply-chain tooling.
+- Live probes against a dev server on a throwaway copy of `data/`, before and after the fixes:
+  - cross-origin requests, Host-header rebinding and LAN access;
+  - path traversal, symlinks, uploads and body size.
+- The privacy guard fed exfiltration-shaped commands (not executed).
+- A headless-browser regression run of the UI after the fixes (browse, search, keyboard, create with upload, edit, delete).
+- `pnpm audit` (clean), plus OSV.dev/NVD audits of yt-dlp 2026.10.26 and ffmpeg 9.0.2.
 
 ## Findings
 
-| # | Severity | Finding | Status |
-| --- | --- | --- | --- |
-| 1 | **High** | API has no authentication and listens on every network interface | Confirmed |
-| 2 | **High** | Any website can create entries, add tags and upload files (cross-site request forgery) | Confirmed |
-| 3 | Medium | Uploaded SVGs are served from the app's origin with scripts enabled | Confirmed |
-| 4 | Medium | Privacy guard is a text heuristic; a prompt injection can get data past it | Confirmed |
-| 5 | Medium | No size limits on request bodies or uploads | Code review |
-| 6 | Medium | Symlinks in `data/` are followed when serving and attaching files | Code review |
-| 7 | Low | Installed tool binaries aren't hash-checked after install | Code review |
-| 8 | Low | ffmpeg builds are checksum-only, and vulnerability data lags | Design |
-| 9 | Low | yt-dlp signing key was pinned on first use | Design |
-| 10 | Low | `entry put` renames a file before validating its path | Code review |
-| 11 | Low | CLI and server can overwrite each other's writes | Code review |
-| 12 | Low | Third-party requests reveal your IP (Google Fonts on every load) | Design |
-| 13 | Info | What a public repo would expose | Design |
+| # | Finding | First rating | In this environment | Status |
+| --- | --- | --- | --- | --- |
+| 1 | API without login listened on every interface | High | Medium | **Fixed** |
+| 2 | Any website could create entries, add tags, upload files | High | Medium | **Fixed** |
+| 3 | Uploaded SVGs served with scripts enabled | Medium | Low | **Fixed** |
+| 4 | Privacy guard bypassable by prompt injection | Medium | Medium | **Hardened**; residual risk |
+| 5 | No size limits on bodies or uploads | Medium | Low | **Fixed** |
+| 6 | Symlinks followed out of `data/` | Medium | Low | **Fixed** |
+| 7 | Tool binaries not hash-checked after install | Low | Info | Accepted |
+| 8 | ffmpeg builds checksum-only; vulnerability data lags | Low | Low | Accepted |
+| 9 | yt-dlp signing key pinned on first use | Low | Low | Accepted |
+| 10 | `entry put` renamed files before validating paths | Low | Low | **Fixed** |
+| 11 | CLI and server could overwrite each other's writes | Low | Info | Accepted |
+| 12 | Third-party requests reveal your IP (Google Fonts) | Low | Low | Accepted (your choice of font) |
+| 13 | Personal data committed to git | Info | Low | **Fixed** going forward; see note |
 
-### 1. Unauthenticated API on all interfaces (High)
+### 1. Exposure (High → Medium, fixed)
 
-`vite.config.ts` sets `host: true` for both `dev` and `preview`, so the server binds to every network interface. There's no authentication. Probe from the LAN address: `GET http://<lan-ip>:5173/api/gallery` → **200** with the full gallery.
+**Why lower:** the VM sits behind NAT, so only the forwarded port reaches it, not the whole LAN. It is still reachable from the network if the host-side forward binds to all interfaces.
 
-**Abuse:** anyone on the same network (café or office Wi-Fi) can do all of the following:
-- read the collection;
-- create, edit and delete entries;
-- upload files, which also makes the server run ffmpeg on them (see 2);
-- read anything in `data/media/` and `data/incoming/`.
+**Fix:** the server now listens on `127.0.0.1` by default. Wider binding is a per-machine opt-in: `INSPO_HOST=0.0.0.0` in the gitignored `.env.local`, which this VM uses for its port forward.
 
-**Fix:** bind to `127.0.0.1` by default and make LAN access an explicit opt-in (e.g. `INSPO_HOST=0.0.0.0`). If LAN access is kept, require a per-session token (printed at startup, sent as a header by the client) on every `/api` and media request.
+**Verified:** without `.env.local` the server prints only `127.0.0.1`, and the LAN address refuses connections.
 
-### 2. Cross-site request forgery on POST routes (High)
+**Still on you:** in the VM's port-forward rule, set the host IP to `127.0.0.1` so the forward isn't reachable from other machines.
 
-The API accepts `text/plain` bodies and doesn't check `Origin`, so a browser sends these from any website without a CORS preflight. Probes with `Origin: https://evil.example`:
-- `POST /api/tags` (text/plain) → **201**, tag created.
-- `POST /api/entries/di-001/media?name=evil.svg` (text/plain) → **201**, file stored and attached.
+### 2. Cross-site request forgery (High → Medium, fixed)
 
-PUT and DELETE need a preflight, which the server answers without `Access-Control-Allow-Origin`, so browsers block those. Cross-origin reads are blocked the same way, and Vite's host check stops DNS rebinding (`Host: evil.example` → 403).
+**Why lower:** Chromium-based browsers now ask before a public site may call `localhost`. It's still real in browsers without that prompt, and a single granted prompt re-opens it.
 
-**Abuse:** while `pnpm dev` is running, any page you visit can add junk entries, fill the disk, or upload a crafted `.mp4`. The server then runs ffmpeg on that file to make a poster. That turns any website into a delivery path for an ffmpeg exploit. The input guard and timeout (see Controls) shrink this surface but don't remove it.
+**Fix:** `/api` refuses requests whose `Sec-Fetch-Site` isn't `same-origin`/`none` or whose `Origin` doesn't match the host (403). JSON routes require `Content-Type: application/json` (415). Uploads require an `X-Inspo-Upload: 1` header (400), which a browser can't send cross-site without a preflight the server never grants.
 
-**Fix:** reject `/api` requests whose `Origin` (or `Sec-Fetch-Site`) isn't the app's own. Require `Content-Type: application/json` for JSON routes and a custom header (e.g. `X-Inspo: 1`) on uploads; both force a preflight. The token from 1 also closes this.
+**Verified:** cross-origin POST, GET and upload → 403. A `text/plain` POST → 415. An upload without the header → 400. The UI still creates, uploads, edits and deletes normally.
 
-### 3. Scripted SVG served from the app's origin (Medium)
+### 3. Scripted SVG (Medium → Low, fixed)
 
-`.svg` counts as an image, and `/media/*` serves it as `image/svg+xml` with no `Content-Security-Policy`. Probe: an SVG with `onload="fetch('/api/gallery')"` was uploaded cross-site (finding 2) and served back unchanged.
+**Why lower:** with 2 fixed, a malicious SVG would have to be added by you, and then opened directly.
 
-**Abuse:** inside the gallery (`<img>`) the script doesn't run. Opening the file directly ("Open image in new tab", or a link) runs it on the app's origin, where it can call PUT and DELETE. Deleted entries are recoverable from git, but edits can be subtle.
+**Fix:** every `/media` and `/incoming` response carries a `sandbox` Content-Security-Policy and `X-Content-Type-Options: nosniff`, so scripts in a file never run, even when opened directly.
 
-**Fix:** send `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` and `X-Content-Type-Options: nosniff` on every `/media` and `/incoming` response. Alternatively, drop SVG from accepted media types, or serve it as an attachment.
+### 4. Privacy guard bypass (Medium, hardened)
 
-### 4. Privacy guard is bypassable by design (Medium)
+**Why unchanged:** sessions handle untrusted text and may auto-approve commands, so a prompt injection is plausible.
 
-`.claude/hooks/privacy-guard.mjs` matches command text against identifiers read at runtime. It reliably catches accidents: an email in a User-Agent, cookies, a direct yt-dlp call (16/16 test cases). But these all **passed**:
-- `curl -T <file>` uploads;
-- `$(…)` command substitution that builds the identifier at run time;
-- Python or Node one-liners that fetch;
-- base64-encoded identifiers in a WebFetch URL;
-- `git push` to a new remote.
+**Hardening:** the guard now also blocks:
+- `curl -T`/`--upload-file` and other upload flags;
+- command substitution (`$(…)`, backticks) inside network commands;
+- inline scripts that use network APIs (`node -e`, `python -c`, …);
+- `git push` to an explicit URL;
+- identifiers hidden with URL or base64 encoding in WebFetch/WebSearch.
 
-**Abuse:** a post's text, a fetched page or a document edit containing instructions (prompt injection) could steer the agent into such a command. The skill tells Claude to treat that content as data, which helps but isn't a guarantee.
+**Verified:** all six earlier bypasses are now blocked, and the 16 regression cases still pass.
 
-**Fix:** treat the guard as a seatbelt, not a wall. Real containment is:
-- **Claude Code's sandbox** with a network allowlist limited to `x.com`, `twimg.com`, `video.twimg.com`, `api.osv.dev`, `services.nvd.nist.gov`, `api.github.com`, GitHub release hosts, `registry.npmjs.org` and `claude.ai`;
-- **permission prompts for any command outside the allow list**, i.e. not running the harness in a mode that auto-approves shell commands.
+**Residual:** it's still a text-pattern check. A script file written first and then run, or a tool it doesn't know, can get past it. Real containment is Claude Code's sandbox with a network allowlist, plus permission prompts for anything off the allow list. Use both for sessions that process untrusted links.
 
-Also add `-T`/`--upload-file` and `git push` to the guard's blocked patterns.
+### 5. Size limits (Medium → Low, fixed)
 
-### 5. No size limits (Medium)
+**Why lower:** after 1 and 2, only local callers reach the API.
 
-`readJson` buffers the whole body and `uploadMedia` streams without a cap. Through 1 or 2, a large body exhausts memory or disk.
+**Fix:** JSON bodies are capped at 1 MB and uploads at 500 MB (413 beyond that).
 
-**Fix:** cap JSON bodies (e.g. 1 MB) and uploads (e.g. 500 MB, matching yt-dlp's `--max-filesize 300M` plus headroom); return 413.
+### 6. Symlinks (Medium → Low, fixed)
 
-### 6. Symlinks followed (Medium)
+**Why lower:** a symlink only gets into `data/` through your own actions, e.g. extracting an archive into `incoming/`.
 
-`serveFile` checks the *path string* against `data/media/` or `data/incoming/`, then `fs.stat`/`createReadStream` follow symlinks. Attaching a file moves the link itself.
+**Fix:** files are served only if their real path is inside `media/` or `incoming/`. The store, `ingest` and `entry put` refuse symlinks.
 
-**Abuse:** a symlink that lands in the drop folder is served over the API and readable from the LAN (1). For example, an archive extracted into `data/incoming/` containing `di-043.png → ~/.ssh/id_ed25519`.
+**Verified:** a symlink in `incoming/` pointing outside `data/` → 403, and it isn't listed as attachable.
 
-**Fix:** `lstat` and refuse symlinks in `listIncoming`, `resolveMedia` and `serveFile`. Or compare `fs.realpath` against the data root.
+### 7. Tool binaries not re-verified (Low → Info, accepted)
 
-### 7. Tool binaries not re-verified after install (Low)
+Swapping a binary in `tools/bin/` requires write access to your account. Someone with that could equally edit the app's code, so a hash check adds little.
 
-`requireSafe()` audits the *version string* the binary prints. Something that can already write to `tools/bin/` could swap in a trojan that prints the expected version.
+### 8. ffmpeg provenance and vulnerability lag (Low, accepted)
 
-**Fix:** record each binary's SHA-256 in `tools/audit.json` at install and compare it before every run.
+BtbN builds have a checksum but no independent signature, NVD lags new CVEs, and the accepted-CVE list is a judgement call. Mitigated by:
+- ffmpeg 9.0.2 (current upstream);
+- an input guard limiting it to local files, four container formats and six video codecs;
+- a 60 s timeout;
+- now, no cross-site uploads (2).
 
-### 8. ffmpeg provenance and vulnerability lag (Low)
+Optional extra: run ffmpeg under an OS sandbox with no network.
 
-- BtbN builds are verified only by a checksum published in the same GitHub release; there's no independent signature. The release is the moving `latest` tag.
-- NVD lags new CVEs by days to weeks. `security/ffmpeg-accepted-cves.json` is a manual judgement.
-- ffmpeg runs with the user's full privileges.
+### 9. Signing key pinned on first use (Low, accepted)
 
-**Fix:** keep the input guard (it removes network protocols and exotic demuxers and decoders, where most ffmpeg CVEs live) and the timeout. Optionally run ffmpeg and yt-dlp under an OS sandbox (bubblewrap/firejail on Linux, `sandbox-exec` on macOS) with no network for ffmpeg and write access only to the item folder.
+The yt-dlp key was fetched once from the yt-dlp repository and pinned by fingerprint (`AC0C BBE6 848D 6A87 3464 AF4E 57CF 6593 3B5A 7581`). Cross-checking it against a keyserver is a manual one-off.
 
-### 9. Trust-on-first-use signing key (Low)
+### 10. `entry put` path order (Low, fixed)
 
-`security/yt-dlp-signing-key.asc` was fetched from the yt-dlp repository once and pinned by fingerprint. If that fetch had been tampered with, the pin would protect the wrong key.
+Every `incoming/…` path is now checked before any file is renamed: it must be a regular file inside `data/incoming/`.
 
-**Fix:** cross-check the fingerprint `AC0C BBE6 848D 6A87 3464 AF4E 57CF 6593 3B5A 7581` against a second channel (a keyserver, or a past release's signature) and note the result next to the key.
+### 11. Cross-process write race (Low → Info, accepted)
 
-### 10. `entry put` renames before validating (Low)
+One user rarely runs the CLI and saves in the app at the same instant. Both write atomically, so the file is never corrupted; at worst one change is lost.
 
-For `incoming/…` paths, `scripts/entry.ts` renames the file to its title slug before the store rejects bad paths. `incoming/../../x` therefore renames a file outside `data/` and then moves it back.
+### 12. Third-party requests (Low, accepted)
 
-**Fix:** resolve the path and require it to stay inside `data/incoming/` before any rename.
+- Google Fonts (Inter) sees your IP address on each app load. Self-host the font if that matters.
+- Source sites (X, `twimg.com`) see your IP address during `ingest`; they never see any identity.
 
-### 11. Cross-process write race (Low, integrity)
+### 13. Personal data in git (fixed going forward)
 
-The store serialises writes within one process. `pnpm entry put` while the dev server is saving can lose one of the two updates; both write atomically, so the file is never corrupt.
+`data/` is now gitignored entirely, and a fresh clone starts with an empty gallery. **`data/gallery.json` is still tracked and is in existing commits:**
+- untrack it with `git rm --cached data/gallery.json`;
+- removing it from the history pushed to GitHub needs a history rewrite.
 
-**Fix:** a lock file (`data/.gallery.lock`) around read-modify-write, or route CLI writes through the running server when it's up.
+## Controls in place
 
-### 12. Third-party requests (Low, privacy)
-
-- Every page load fetches Inter from Google Fonts, which gives Google your IP address and user agent.
-- `ingest` necessarily contacts X (`cdn.syndication.twimg.com`, `pbs.twimg.com`, `video.twimg.com`) and other source sites with the generic `inspo-tools` user agent; they see your IP address.
-
-**Fix:** self-host Inter (vet the package first with `pnpm tools vet`). Use a VPN if source sites seeing your IP matters.
-
-### 13. If the repository is public (Info)
-
-Visibility couldn't be checked from here. If the repository is public, it exposes:
-- `data/gallery.json`: every entry, the tag vocabulary including personal ones (e.g. a tag for your own site), and the capture document's link (`source_doc`). That link still requires claude.ai access and the document's sharing settings.
-- The commit author email in git history. GitHub's `noreply` address avoids this for future commits.
-
-Media, tools and local settings are gitignored. No secrets, tokens or credentials are committed.
-
-## Controls already in place
-
+- **Network:**
+  - localhost by default;
+  - cross-site requests refused; JSON-only bodies and an upload header;
+  - size caps; a sandboxing CSP on media;
+  - no symlinks out of `data/`;
+  - a Host check against DNS rebinding;
+  - path traversal blocked.
+- **Data:** writes validated against `schema/inspo-v1.schema.json` (ajv) plus cross-reference checks, written atomically. Media is never deleted. `data/` is never in git.
 - **Supply chain:**
-  - yt-dlp and ffmpeg are audited on OSV.dev/NVD *before* download and installed only after GPG and SHA-256 checks. They are re-audited before every use (cached 24 h, failing closed).
-  - New npm packages are checked with `pnpm tools vet`, pinned exactly, then `pnpm audit`ed.
-  - Lockfile committed; only `esbuild` may run install scripts.
-- **ffmpeg hardening:** local files only, mov/mp4/matroska/webm, six video codecs, 60 s timeout. Debian's ffmpeg 7.1.5 is refused (34 unaccepted CVEs).
-- **yt-dlp hardening:**
-  - fixed arguments: no config files, plugins, cookies, `--exec` or self-update;
-  - restricted filenames and a size cap;
-  - no generic page scraping.
+  - yt-dlp and ffmpeg audited (OSV.dev/NVD) before download, GPG/SHA-256 verified, and re-audited before every use (24 h cache, fails closed);
+  - npm packages vetted with `pnpm tools vet`, pinned exactly, `pnpm audit`ed;
+  - only `esbuild` may run install scripts.
+- **Tools at run time:**
+  - ffmpeg limited to local files and common formats and codecs, with a timeout;
+  - yt-dlp with fixed arguments (no config, plugins, cookies, `--exec` or self-update).
 - **Identity:**
   - every request uses the generic `inspo-tools` user agent;
-  - identifiers are read at runtime, never stored;
-  - browser-control tools, raw downloaders and package installs are denied in `.claude/settings.json`.
-- **Web app:**
-  - path traversal blocked (`..%2f` → 403);
-  - React escapes all text, and source URLs must be http(s);
-  - Host-header check blocks DNS rebinding;
-  - cross-origin reads, PUT and DELETE are blocked by the browser;
-  - all writes are schema-validated (ajv) and atomic, and media is never deleted.
-
-## Recommended order of fixes
-
-1. Bind to `127.0.0.1` by default (1). This is a one-line change that removes most network exposure.
-2. Origin / content-type / custom-header checks on `/api` (2), plus body and upload limits (5).
-3. CSP `sandbox` + `nosniff` on media responses (3); refuse symlinks (6); path check in `entry put` (10).
-4. Run the harness with Claude Code's sandbox and a network allowlist, and keep permission prompts on (4).
-5. Hash-pin installed tools (7) and self-host the font (12).
+  - identifiers are read at runtime and never stored;
+  - the privacy guard runs on every shell command and web request;
+  - browser-control tools, raw downloaders and package installs are denied.

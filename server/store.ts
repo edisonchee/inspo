@@ -39,7 +39,29 @@ export function createStore(dataDir: string) {
     return run;
   }
 
+  /** A new, empty gallery: what a fresh clone starts with (data/ is never in git). */
+  const EMPTY: Gallery = {
+    schema: 'inspo/v1',
+    next_id: 'di-001',
+    categories: [
+      { id: 'techniques', name: 'Techniques', rule: 'A principle or a few lines of code.' },
+      { id: 'components', name: 'Components & Patterns', rule: 'How a reusable UI component or pattern behaves.' },
+      { id: 'showpieces', name: 'Showpieces', rule: 'Expressive work you admire as a whole.' },
+      { id: 'systems', name: 'Systems & Tools', rule: 'Design systems, libraries and tools.' },
+      { id: 'inbox', name: 'Inbox', rule: 'Saved but not yet described.' },
+    ],
+    tags: [],
+    entries: [],
+  };
+
   async function read(): Promise<Gallery> {
+    const text = await fs.readFile(galleryPath, 'utf8').catch((e: NodeJS.ErrnoException) => {
+      if (e.code !== 'ENOENT') throw e;
+      return null;
+    });
+    if (text !== null) return JSON.parse(text);
+    await fs.mkdir(mediaDir, { recursive: true });
+    await fs.writeFile(galleryPath, JSON.stringify(EMPTY, null, 2) + '\n', { flag: 'wx' }).catch(() => {});
     return JSON.parse(await fs.readFile(galleryPath, 'utf8'));
   }
 
@@ -77,6 +99,14 @@ export function createStore(dataDir: string) {
       () => true,
       () => false,
     );
+  }
+
+  /** A regular file (not a symlink) whose real location is inside the data folder. */
+  async function isPlainFileInside(file: string): Promise<boolean> {
+    const st = await fs.lstat(abs(file)).catch(() => null);
+    if (!st?.isFile()) return false;
+    const [real, root] = await Promise.all([fs.realpath(abs(file)), fs.realpath(dataDir)]);
+    return real.startsWith(root + path.sep);
   }
 
   /** A free `media/<id>-<slug><ext>` path for this entry. */
@@ -126,7 +156,7 @@ export function createStore(dataDir: string) {
       }
       const fromMedia = /^media\/[^/]+$/.test(file) && !usedElsewhere.has(file);
       const fromIncoming = /^incoming\/[^\0]+$/.test(file) && !file.split('/').some((p) => p === '..' || p.startsWith('.'));
-      if (!(fromMedia || fromIncoming) || !(await exists(abs(file)))) {
+      if (!(fromMedia || fromIncoming) || !(await isPlainFileInside(file))) {
         throw bad(`${file} is not an unreferenced file in media/ or a file in incoming/`);
       }
       const type = mediaTypeFor(file);
@@ -261,6 +291,14 @@ export function createStore(dataDir: string) {
         if (!entry) throw new HttpError(404, `no entry ${id}`);
         await write({ ...g, entries: g.entries.filter((e) => e.id !== id) });
         for (const m of entry.media) await releaseMedia(m.file);
+      }),
+
+    /** Record the capture document's link (top-level `source_doc`). */
+    setSourceDoc: (url: string) =>
+      exclusive(async () => {
+        const g = await read();
+        await write({ ...g, source_doc: url });
+        return url;
       }),
 
     addTag: (tag: Tag) =>

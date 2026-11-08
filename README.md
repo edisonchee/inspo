@@ -34,8 +34,12 @@ On macOS, install ffmpeg with `brew install ffmpeg`; `pnpm tools install` still 
 ```
 data/
   gallery.json   entries, categories and tags (schema: inspo/v1)
-  media/         videos and images (not in git; copy between machines)
-  incoming/      drop folder for media not yet in the gallery (not in git)
+  media/         videos and images
+  incoming/      drop folder for media not yet in the gallery
 ```
 
+`data/` is personal and never in git. A fresh clone starts with an empty gallery; to move your collection, copy the whole folder. Record your capture document's link once with `pnpm entry source-doc <link>`, or let Claude Code ask for it.
+
 `pnpm check` validates the folder.
+
+The dev server only listens on this machine. To open it from elsewhere (e.g. a VM's forwarded port), put `INSPO_HOST=0.0.0.0` in `.env.local`. The app has no login, so only do that on a network you trust.

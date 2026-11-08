@@ -5,7 +5,7 @@ description: Use when the user asks to complete, finish, sync or process unfinis
 
 # Complete unfinished items
 
-The capture document (a Claude Artifact, edited through the Claude Docs connector) is the source of truth. Its link is `source_doc` in `data/gallery.json`. Privacy and tool rules in CLAUDE.md apply throughout.
+The capture document (a Claude Artifact, edited through the Claude Docs connector) is the source of truth. Its link is `source_doc` in `data/gallery.json`. If that's missing (e.g. a fresh clone), ask the user for the link and record it with `pnpm -s entry source-doc <link>`. Privacy and tool rules in CLAUDE.md apply throughout.
 
 1. **Read the document.** Load the docs skill, then read it: the index/instructions tab first (columns, category tabs, tag vocabulary, next ID, editing rules), then the category and inbox tabs. Follow the document's own rules for every edit you make to it.
 2. **List the work** and show it to the user in one short list before starting:

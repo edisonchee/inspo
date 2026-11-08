@@ -96,6 +96,17 @@ describe('store', () => {
     await expect(s.createEntry(input({ media: ['incoming/../gallery.json'] }))).rejects.toThrow(/incoming/);
   });
 
+  it('creates an empty gallery when the data folder is new', async () => {
+    const fresh = mkdtempSync(path.join(tmpdir(), 'inspo-fresh-'));
+    try {
+      const s = createStore(path.join(fresh, 'data'));
+      expect(await s.read()).toMatchObject({ schema: 'inspo/v1', next_id: 'di-001', entries: [] });
+      expect((await s.createEntry(input({ category: 'inbox', tags: [] }))).id).toBe('di-001');
+    } finally {
+      rmSync(fresh, { recursive: true, force: true });
+    }
+  });
+
   it('uploads media and adds tags', async () => {
     const s = createStore(dir);
     const e = await s.createEntry(input());

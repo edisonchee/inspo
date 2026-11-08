@@ -74,8 +74,9 @@ A portable, local-first design-curation workflow and gallery viewer. It holds cl
   - `tags[] {tag,facet}`: a controlled vocabulary. Facet is `Component|Technique|Theme|Use`; tags are kebab-case.
   - `entries[] {id,added,category,title,why,tags[],source{label,url},media[{file,type}]}`. `id` is `di-NNN`, never reused, higher = newer. `why` and `media` may be empty.
   - Preserve `next_id`, `exported`, `source_doc` and any unknown fields on write.
-- `media/` (gitignored): `di-NNN-<slug>.<ext>`. `media/posters/` holds derived JPEGs.
-- `incoming/` (gitignored): the drop folder (see How it works).
+- `media/`: `di-NNN-<slug>.<ext>`. `media/posters/` holds derived JPEGs.
+- `incoming/`: the drop folder (see How it works).
+- **All of `data/` is gitignored** (personal). The store creates an empty gallery on first read, and `pnpm entry source-doc <link>` records the capture document. Never add data files to git.
 
 ## Conventions
 
@@ -87,4 +88,6 @@ A portable, local-first design-curation workflow and gallery viewer. It holds cl
 
 ## Commands
 
-`pnpm dev` (5173) · `pnpm build` · `pnpm preview` (4173) · `pnpm test` · `pnpm check` (validate gallery vs media) · `pnpm tools install|audit|status|vet <pkg>` · `pnpm ingest <id> [url]` / `pnpm ingest --list` · `pnpm entry put <file.json>`. Set `INSPO_DATA_DIR` to use another data folder.
+`pnpm dev` (5173) · `pnpm build` · `pnpm preview` (4173) · `pnpm test` · `pnpm check` (validate gallery vs media) · `pnpm tools install|audit|status|vet <pkg>` · `pnpm ingest <id> [url]` / `pnpm ingest --list` · `pnpm entry put <file.json>` · `pnpm entry source-doc <link>`. Set `INSPO_DATA_DIR` to use another data folder.
+
+**Server exposure:** the API has no login. It listens on `127.0.0.1` unless `INSPO_HOST` is set in `.env.local` (gitignored, per machine). It refuses cross-site requests, requires `Content-Type: application/json` on JSON routes and `X-Inspo-Upload: 1` on uploads, caps bodies (1 MB JSON, 500 MB uploads), serves media with a sandboxing CSP, and never follows symlinks out of `data/`. Keep these when changing `server/plugin.ts` or `src/lib/api.ts`.

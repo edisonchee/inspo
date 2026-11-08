@@ -4,7 +4,8 @@ async function call<T>(method: string, url: string, body?: BodyInit, json = true
   const res = await fetch(url, {
     method,
     body,
-    headers: body && json ? { 'Content-Type': 'application/json' } : undefined,
+    // JSON bodies declare their type; uploads carry X-Inspo-Upload (the server requires both, see server/plugin.ts).
+    headers: body ? (json ? { 'Content-Type': 'application/json' } : { 'X-Inspo-Upload': '1' }) : undefined,
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error ?? `${method} ${url} failed (${res.status})`);

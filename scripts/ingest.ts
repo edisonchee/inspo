@@ -72,9 +72,13 @@ async function frames(ffmpeg: string, file: string, dir: string): Promise<string
   return out;
 }
 
+/** Regular media files in a folder; symlinks are ignored so nothing outside data/ can be pulled in. */
 async function mediaIn(dir: string): Promise<string[]> {
-  const names = await fs.readdir(dir).catch(() => [] as string[]);
-  return names.filter((f) => !f.startsWith('.') && mediaTypeFor(f)).sort().map((f) => path.join(dir, f));
+  const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
+  return entries
+    .filter((d) => d.isFile() && !d.name.startsWith('.') && mediaTypeFor(d.name))
+    .map((d) => path.join(dir, d.name))
+    .sort();
 }
 
 async function list() {
@@ -98,8 +102,10 @@ async function prepare(id: string, url: string | undefined) {
   await fs.mkdir(dir, { recursive: true });
 
   // Gather loose files named for this ID.
-  for (const f of await fs.readdir(INCOMING)) {
-    if (new RegExp(`^${id}(?![0-9])`).test(f) && mediaTypeFor(f)) await fs.rename(path.join(INCOMING, f), path.join(dir, f));
+  for (const d of await fs.readdir(INCOMING, { withFileTypes: true })) {
+    if (d.isFile() && new RegExp(`^${id}(?![0-9])`).test(d.name) && mediaTypeFor(d.name)) {
+      await fs.rename(path.join(INCOMING, d.name), path.join(dir, d.name));
+    }
   }
 
   const x = url ? X_POST.exec(url) : null;

@@ -43,15 +43,32 @@ function leaks(text) {
   return hit ? 'it contains an identifier of this user or machine' : null;
 }
 
+/** The text plus URL-decoded and base64-decoded forms of its tokens, so simple encodings don't hide identifiers. */
+function decoded(text) {
+  const out = [text];
+  try {
+    out.push(decodeURIComponent(text));
+  } catch {}
+  for (const token of text.match(/[A-Za-z0-9+/_-]{8,}={0,2}/g) ?? []) {
+    out.push(Buffer.from(token.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
+  }
+  return out.join(' ');
+}
+
 if (tool === 'WebFetch' || tool === 'WebSearch') {
-  const why = leaks(`${args.url ?? ''} ${args.query ?? ''}`);
+  const why = leaks(decoded(`${args.url ?? ''} ${args.query ?? ''}`));
   if (why) block(`this ${tool} request would send it: ${why}.`);
   process.exit(0);
 }
 
 if (tool === 'Bash') {
   const cmd = String(args.command ?? '');
-  const NET = /\b(curl|wget|yt-dlp|gallery-dl|aria2c|httpie|http|nc|ncat|socat|telnet|ftp|sftp|scp|ssh|rsync)\b|\bfetch\(|https?:\/\//i;
+  // Ad-hoc network code in inline scripts would bypass every check below (it can build URLs at run time).
+  const INLINE = /\b(node|deno|bun)\s+(-e|--eval|-p|--print)\b|\bpython3?\s+-c\b|\bperl\s+-e\b|\bruby\s+-e\b/;
+  const NET_API = /\b(https?|net|tls|dgram|fetch|socket|urllib|requests|httpx|XMLHttpRequest|WebSocket|LWP|Net::HTTP|open-uri)\b/;
+  if (INLINE.test(cmd) && NET_API.test(cmd)) block('inline scripts that use the network are not allowed; use pnpm ingest or WebFetch.');
+
+  const NET = /\b(curl|wget|yt-dlp|gallery-dl|aria2c|httpie|http|nc|ncat|socat|telnet|ftp|sftp|scp|ssh|rsync)\b|\bfetch\(|https?:\/\/|\bgit\s+push\b/i;
   if (!NET.test(cmd)) process.exit(0);
 
   // Downloaders run only through `pnpm ingest` (fixed, audited arguments).
@@ -60,8 +77,14 @@ if (tool === 'Bash') {
   if (DOWNLOADER.test(cmd)) block('run downloaders only through `pnpm ingest`.');
 
   // Requests that carry identity or credentials.
-  const RISKY = /(^|\s)(-A|-H|-b|-c|-u|-d|-F|-e|--user-agent|--header|--cookie\S*|--user|--data\S*|--form|--referer|--netrc\S*|--add-headers?|--username|--password|--post-data|--load-cookies)(\s|=|$)/;
+  const RISKY = /(^|\s)(-A|-H|-b|-c|-u|-d|-F|-e|-T|--user-agent|--header|--cookie\S*|--user|--data\S*|--form|--upload-file|--referer|--netrc\S*|--add-headers?|--username|--password|--post-data|--post-file|--body-file|--load-cookies)(\s|=|$)/;
   if (/\b(curl|wget)\b/.test(cmd) && RISKY.test(cmd)) block('custom headers, user agents, cookies, credentials or uploads are not allowed.');
+
+  // Values computed at run time can smuggle anything into a request; network commands must be literal.
+  if (/\$\(|`/.test(cmd)) block('command substitution inside a network command is not allowed; use literal values.');
+
+  // Pushing to an explicit URL sends repository contents to an arbitrary server.
+  if (/\bgit\s+push\s+(\S+\s+)*(https?:|ssh:|git@|git:)/.test(cmd)) block('git push to an explicit URL is not allowed.');
 
   // Identifiers anywhere outside local paths (the home path itself is fine as a file location).
   // Local paths (after start, space, =, quote or paren; never the `//` of a URL) are file locations, not payload.

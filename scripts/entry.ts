@@ -1,4 +1,5 @@
 // pnpm entry put <file.json>
+// pnpm entry source-doc <link>  record the capture document's link in gallery.json (source_doc)
 // Create or update one gallery entry from JSON, validated and written atomically by the store.
 //
 // {
@@ -26,8 +27,13 @@ interface Put extends EntryInput {
 
 async function main() {
   const [cmd, file] = process.argv.slice(2);
+  if (cmd === 'source-doc' && file) {
+    const dataDir = process.env.INSPO_DATA_DIR ?? path.join(ROOT, 'data');
+    console.log(await createStore(dataDir).setSourceDoc(file));
+    return;
+  }
   if (cmd !== 'put' || !file) {
-    console.error('usage: pnpm entry put <file.json>');
+    console.error('usage: pnpm entry put <file.json> | pnpm entry source-doc <link>');
     process.exit(2);
   }
   const put = JSON.parse(await fs.readFile(file, 'utf8')) as Put;
@@ -38,6 +44,13 @@ async function main() {
   for (const t of put.newTags ?? []) if (!g.tags.some((x) => x.tag === t.tag)) await store.addTag(t);
 
   // Name incoming files after the title, so the store's final name is di-NNN-<title-slug>.<ext>.
+  // Check every incoming path before touching any file: a regular file inside data/incoming/, no symlinks.
+  const incoming = path.join(path.resolve(dataDir), 'incoming') + path.sep;
+  for (const m of (put.media ?? []).filter((x) => x.startsWith('incoming/'))) {
+    const st = await fs.lstat(path.resolve(dataDir, m)).catch(() => null);
+    if (!path.resolve(dataDir, m).startsWith(incoming) || !st?.isFile()) throw new Error(`${m}: not a regular file inside data/incoming/`);
+  }
+
   const renamed: [string, string][] = [];
   const media: string[] = [];
   for (const m of put.media ?? []) {
@@ -45,7 +58,7 @@ async function main() {
       media.push(m);
       continue;
     }
-    const from = path.join(dataDir, m);
+    const from = path.resolve(dataDir, m);
     const ext = path.extname(m).toLowerCase();
     let to = path.join(path.dirname(from), `${slugify(put.title)}${ext}`);
     for (let n = 2; to !== from && existsSync(to); n++) to = path.join(path.dirname(from), `${slugify(put.title)}-${n}${ext}`);
