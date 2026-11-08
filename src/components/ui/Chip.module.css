@@ -1,0 +1,51 @@
+/* Small tag chip, used for selected tags and tag lists. Can be a button or a span. */
+/* Labels are trimmed to cap height so flex centering puts the caps exactly mid-capsule. */
+.chip > span {
+  text-box: trim-both cap alphabetic;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 1.625rem;
+  padding-inline: var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
+  color: var(--color-text);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  outline-offset: 1px;
+}
+
+button.chip {
+  cursor: pointer;
+}
+
+button.chip:hover,
+.chip[data-highlighted] {
+  background: var(--color-surface-hover);
+}
+
+.remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  margin-right: calc(-1 * var(--space-1));
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.remove:hover {
+  color: var(--color-text);
+  background: var(--color-surface);
+}

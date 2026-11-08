@@ -147,3 +147,9 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Inspo: media and the incoming drop folder (kept out of git), installed tools and atomic-write temp files
+data/media/
+data/incoming/
+tools/
+data/*.tmp

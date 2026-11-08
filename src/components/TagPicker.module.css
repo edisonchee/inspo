@@ -1,0 +1,46 @@
+.group {
+  display: flex;
+  align-items: center;
+  height: auto;
+  padding: var(--space-1) var(--space-2);
+  cursor: text;
+}
+
+.group:focus-within {
+  border-color: var(--color-focus);
+  outline: var(--focus-ring-width) solid var(--color-focus);
+  outline-offset: 0;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.input {
+  flex: 1;
+  min-width: 8rem;
+  height: 1.75rem;
+  padding: 0 var(--space-1);
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+.input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.input:focus-visible {
+  outline: 0;
+}
+
+.form {
+  display: grid;
+  gap: var(--space-4);
+}

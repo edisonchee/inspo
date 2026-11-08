@@ -1,0 +1,37 @@
+{
+  "name": "inspo",
+  "description": "A portable, local-first design curation workflow and gallery viewer, built on a self-contained data folder.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "check": "tsx scripts/check.ts",
+    "tools": "tsx scripts/tools.ts",
+    "ingest": "tsx scripts/ingest.ts",
+    "entry": "tsx scripts/entry.ts"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.9.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
+  },
+  "packageManager": "pnpm@10.12.4",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

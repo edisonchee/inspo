@@ -1,0 +1,126 @@
+/*
+  Design tokens. Components consume only the semantic tokens below, never raw values.
+*/
+
+:root {
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
+  /* Type */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem;
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* Sizes */
+  --control-height: 2.25rem;
+  --control-height-sm: 1.875rem;
+  --focus-ring-width: 2px;
+
+  /* Motion */
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Layers */
+  --z-sticky: 5;
+  --z-dialog: 10;
+  --z-popup: 20;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-normal: 0ms;
+  }
+}
+
+/*
+  Colors: each token is light-dark(light, dark), resolved by the inherited color-scheme.
+  System by default; <html data-theme="light|dark"> forces one.
+*/
+:root {
+  color-scheme: light dark;
+}
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+:root {
+  /*
+    Neutral ramp: 12 steps, each a light-dark() pair, so a step means the same role in both themes
+    (1 = app background … 12 = high-contrast text). Semantic tokens below map onto it.
+      1 app bg · 2 subtle bg · 3 element bg · 4 hover bg, hairline border · 5 media outline
+      6–7 stronger borders · 8 control border · 9 solid · 10 muted text · 11 secondary text · 12 text
+  */
+  --neutral-1: light-dark(#f7f7f8, #111113);
+  --neutral-2: light-dark(#f1f1f3, #18181b);
+  --neutral-3: light-dark(#ececef, #232328);
+  --neutral-4: light-dark(#e4e4e8, #2c2c32);
+  --neutral-5: light-dark(#dcdce1, #34343b);
+  --neutral-6: light-dark(#d1d1d7, #3e3e46);
+  --neutral-7: light-dark(#bcbcc4, #4f4f58);
+  --neutral-8: light-dark(#8b8b95, #73737e);
+  --neutral-9: light-dark(#71717b, #8a8a94);
+  --neutral-10: light-dark(#5c5c66, #a3a3ad);
+  --neutral-11: light-dark(#3f3f46, #cfcfd6);
+  --neutral-12: light-dark(#18181b, #ededf0);
+
+  --color-bg: var(--neutral-1);
+  --color-surface: light-dark(#ffffff, #1b1b1f);
+  --color-surface-sunken: var(--neutral-3);
+  --color-surface-hover: var(--neutral-4);
+  --color-text: var(--neutral-12);
+  --color-text-muted: var(--neutral-10);
+  --color-border: var(--neutral-4);
+  --color-border-strong: var(--neutral-8);
+  --color-media-outline: var(--neutral-5);
+  --color-accent: light-dark(#5144d3, #a197ff);
+  --color-accent-hover: light-dark(#4135bd, #b8b0ff);
+  --color-on-accent: light-dark(#ffffff, #111113);
+  --color-selected: var(--neutral-12);
+  --color-on-selected: light-dark(#ffffff, #111113);
+  --color-danger: light-dark(#c42b2b, #ff8f87);
+  --color-on-danger: light-dark(#ffffff, #111113);
+  --color-focus: light-dark(#5144d3, #a197ff);
+  --color-mark: light-dark(#fde68a, #715f0f);
+  --color-on-mark: light-dark(#18181b, #ffffff);
+  --color-backdrop: light-dark(rgb(24 24 27 / 0.55), rgb(0 0 0 / 0.7));
+  --color-overlay: rgb(24 24 27 / 0.72);
+  --color-on-overlay: #ffffff;
+  --color-stage: light-dark(#e4e4e8, #0b0b0d);
+  --color-shadow: light-dark(rgb(24 24 27 / 0.1), rgb(0 0 0 / 0.5));
+  --color-shadow-strong: light-dark(rgb(24 24 27 / 0.2), rgb(0 0 0 / 0.6));
+  --color-edge: light-dark(transparent, rgb(255 255 255 / 0.06));
+
+  --shadow-sm: 0 1px 2px var(--color-shadow);
+  --shadow-md: 0 4px 16px var(--color-shadow), 0 0 0 1px var(--color-edge);
+  --shadow-lg: 0 24px 64px var(--color-shadow-strong), 0 0 0 1px var(--color-edge);
+}

@@ -1,0 +1,13 @@
+{
+  "reviewed": "2026-11-08",
+  "policy": "A CVE may be listed here only if it cannot be reached given FFMPEG_INPUT_GUARD (local files; mov/mp4/matroska/webm; h264/hevc/vp8/vp9/av1/mpeg4) and JPEG-only output, or if its worst case is a crash/hang that FFMPEG_TIMEOUT_MS kills. Anything else blocks ffmpeg until it is upgraded.",
+  "cves": [
+    { "id": "CVE-2025-25468", "reason": "Memory leak in libavutil/mem.c; each ffmpeg run is a short-lived process." },
+    { "id": "CVE-2025-25469", "reason": "Memory leak in libavutil/iamf.c; each ffmpeg run is a short-lived process." },
+    { "id": "CVE-2026-107675", "reason": "sftp protocol handler; protocol_whitelist allows only local files." },
+    { "id": "CVE-2026-107676", "reason": "Leaks bytes into remuxed/transcoded HDR10+ metadata; we only write JPEG frames, which carry no such metadata." },
+    { "id": "CVE-2026-107677", "reason": "DASH demuxer infinite loop; format_whitelist excludes DASH." },
+    { "id": "CVE-2026-107678", "reason": "Crafted MP4 pssh boxes crash the process or burn CPU; denial of service only, bounded by FFMPEG_TIMEOUT_MS." },
+    { "id": "CVE-2026-107696", "reason": "RTSP redirect loop; protocol_whitelist allows only local files." }
+  ]
+}

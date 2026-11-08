@@ -1,0 +1,26 @@
+.trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  text-align: left;
+  cursor: pointer;
+}
+
+.trigger[data-popup-open] {
+  border-color: var(--color-focus);
+}
+
+.value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.value[data-placeholder] {
+  color: var(--color-text-muted);
+}
+
+.icon {
+  color: var(--color-text-muted);
+}

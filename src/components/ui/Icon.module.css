@@ -1,0 +1,13 @@
+.icon {
+  display: block;
+  flex: none;
+  width: 1.125em;
+  height: 1.125em;
+}
+
+.inline {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
+}

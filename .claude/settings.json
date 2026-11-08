@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm ingest:*)",
+      "Bash(pnpm -s ingest:*)",
+      "Bash(pnpm entry put:*)",
+      "Bash(pnpm -s entry put:*)",
+      "Bash(pnpm check)",
+      "Bash(pnpm test)",
+      "Bash(pnpm tools audit)",
+      "Bash(pnpm -s tools status)"
+    ],
+    "deny": [
+      "Bash(yt-dlp:*)",
+      "Bash(tools/bin/yt-dlp:*)",
+      "Bash(gallery-dl:*)",
+      "Bash(pip install:*)",
+      "Bash(pipx install:*)",
+      "Bash(brew install:*)",
+      "Bash(apt install:*)",
+      "Bash(apt-get install:*)",
+      "Bash(winget install:*)",
+      "mcp__claude-in-chrome",
+      "mcp__Claude_Browser",
+      "mcp__plugin_chrome-devtools-mcp_chrome-devtools"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [{ "type": "command", "command": "cd \"$CLAUDE_PROJECT_DIR\" && pnpm -s tools status" }]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|WebFetch|WebSearch",
+        "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/privacy-guard.mjs\"" }]
+      }
+    ]
+  }
+}
