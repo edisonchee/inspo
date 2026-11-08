@@ -2,19 +2,20 @@
 
 A portable, local-first workflow for curating design inspiration, plus a gallery to browse it. Each item is a clip, screenshot or link with a note on why it's worth keeping.
 
-- **Local-first.** Everything lives in one `data/` folder on your machine. There's no account, no database and no cloud service; the app reads and writes plain files.
-- **Portable.** The `data/` folder is the part that matters: a documented structure and one JSON schema. Copy it to another machine, back it up anywhere, or point the app at it with `INSPO_DATA_DIR`. Any other tool that reads JSON can use it too.
-- **Extensible.** Because the data is just files plus a small HTTP API (`/api/gallery`, `/media/…`), the same folder could later be hosted on a remote server and the viewer pointed at it. That isn't built yet.
+- **Local-first.** Everything lives in one `data/` folder on your machine. There's no account, no database and no cloud service.
+- **Portable.** The `data/` folder is the part that matters: a simple structure and one JSON format, defined in [`schema/inspo-v1.schema.json`](schema/inspo-v1.schema.json). Copy it anywhere, back it up, or read it with any tool that reads JSON.
+- **Private by design.** The Claude Code harness includes a privacy guard. Before Claude runs a command or fetches a page, it blocks anything that would send your email, name, username, cookies or credentials to a website. Download tools are checked for known vulnerabilities before they're installed and every time they run.
+- **Extensible.** The data is plain files behind a small HTTP API, so the folder could later be hosted on a remote server. That isn't built yet.
 
 ## How it works
 
-Your capture document, a Claude Artifact whose link is `source_doc` in `data/gallery.json`, is the source of truth. In Claude (desktop or phone), add a link and a few words to it. Then add the item to the gallery in one of three ways:
+Capture items anywhere: in Claude (desktop or phone), add a link and a few words to your capture document, a Claude Artifact whose link is `source_doc` in `data/gallery.json`. Then add them to the gallery in one of three ways:
 
-1. **Fully automated.** Open Claude Code in this folder and ask it to complete the unfinished items. It downloads the media, looks at a few frames, writes the description and tags, adds the entry, and updates the document.
-2. **Semi-automated.** Download the media yourself and drop it in `data/incoming/`, named or foldered by the item's ID (`di-043.mp4` or `di-043/…`). Then ask Claude Code to complete the items; it uses your files instead of downloading.
-3. **Fully manual.** In the app, click **New entry** and upload files or attach them from `data/incoming/`.
+1. **Fully automated.** Ask Claude Code, in this folder, to complete the unfinished items. It downloads the media, looks at it, writes the description and tags, and updates your document.
+2. **Semi-automated.** Drop media you downloaded into `data/incoming/` (as `di-043.mp4` or `di-043/…`), then ask Claude Code as above.
+3. **Fully manual.** In the app, click **New entry**.
 
-Run the app to browse, search and watch everything.
+Diagrams and details are in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Setup
 
@@ -22,7 +23,7 @@ Requires Node.js 20+, pnpm and gpg.
 
 ```sh
 pnpm i
-pnpm tools install   # checks yt-dlp and ffmpeg for known vulnerabilities, verifies them, installs into tools/
+pnpm tools install   # vets, verifies and installs yt-dlp and ffmpeg into tools/
 pnpm dev             # http://localhost:5173
 ```
 
@@ -30,35 +31,11 @@ On macOS, install ffmpeg with `brew install ffmpeg`; `pnpm tools install` still 
 
 ## Your data
 
-The `data/` folder is self-contained:
-
 ```
 data/
-  gallery.json   every entry, category and tag (in git)
-  media/         videos and images, named di-NNN-<slug>.<ext> (not in git; copy between machines)
-    posters/     video thumbnails, regenerated automatically
+  gallery.json   entries, categories and tags (schema: inspo/v1)
+  media/         videos and images (not in git; copy between machines)
   incoming/      drop folder for media not yet in the gallery (not in git)
 ```
 
-`gallery.json` uses the `design-inspiration/v1` schema:
-
-```jsonc
-{
-  "schema": "design-inspiration/v1",
-  "next_id": "di-042",
-  "source_doc": "https://claude.ai/artifact/…",   // the capture document
-  "categories": [{ "id": "techniques", "name": "Techniques", "rule": "…" }],
-  "tags": [{ "tag": "motion", "facet": "Technique" }],   // facet: Component | Technique | Theme | Use
-  "entries": [{
-    "id": "di-041", "added": "2026-11-08", "category": "techniques",
-    "title": "…", "why": "…", "tags": ["motion"],
-    "source": { "label": "someone on X", "url": "https://…" },
-    "media": [{ "file": "media/di-041-slug.mp4", "type": "video" }]   // paths relative to data/
-  }]
-}
-```
-
-IDs are never reused. Tags must come from `tags`. Fields the app doesn't know are kept untouched.
-
-- `pnpm check` validates the folder: IDs, tags, categories, and that every referenced file exists.
-- `pnpm tools audit` re-checks the installed tools against current vulnerability reports.
+`pnpm check` validates the folder.

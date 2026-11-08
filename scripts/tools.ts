@@ -1,6 +1,8 @@
 // pnpm tools install   download, verify and install yt-dlp + ffmpeg into tools/bin/ (gitignored)
 // pnpm tools audit     re-check the installed versions against OSV.dev / NVD now
 // pnpm tools status    cached one-line check per tool (used by the SessionStart hook)
+// pnpm tools vet <npm-package>[@version]   check a package (and its direct dependencies) on OSV.dev BEFORE
+//                      adding it; after `pnpm add`, `pnpm audit` covers the whole tree
 //
 // Order of operations for each tool: look up the release → audit that version against the public
 // vulnerability databases → download → verify (yt-dlp: GPG signature with the pinned key + SHA-256;
@@ -10,7 +12,7 @@ import { createWriteStream, existsSync, promises as fs } from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { BIN_DIR, ROOT, TOOLS_DIR, USER_AGENT, audit, auditVersion, run, toolVersion, type ToolName } from '../server/tools.ts';
+import { BIN_DIR, ROOT, TOOLS_DIR, USER_AGENT, audit, auditVersion, getJson, osvVulns, run, toolVersion, type ToolName } from '../server/tools.ts';
 
 const YTDLP_KEY = path.join(ROOT, 'security', 'yt-dlp-signing-key.asc');
 /** Fingerprint of the pinned key file; a changed key file is refused. */
@@ -207,6 +209,29 @@ async function installFfmpeg(): Promise<boolean> {
 
 async function main() {
   const cmd = process.argv[2] ?? 'audit';
+  if (cmd === 'vet') {
+    const spec = process.argv[3];
+    if (!spec) throw new Error('usage: pnpm tools vet <npm-package>[@version]');
+    const at = spec.lastIndexOf('@');
+    const [name, wanted] = at > 0 ? [spec.slice(0, at), spec.slice(at + 1)] : [spec, 'latest'];
+    const meta = (await getJson(`https://registry.npmjs.org/${name.replace('/', '%2F')}/${wanted}`)) as {
+      version: string;
+      dependencies?: Record<string, string>;
+    };
+    let ok = true;
+    const check = async (pkg: string, version: string, indent = '') => {
+      const vulns = await osvVulns(pkg, version, 'npm');
+      console.log(`${indent}${vulns.length ? '✗' : '✓'} ${pkg}@${version}${vulns.length ? `\n${indent}  ${vulns.join(`\n${indent}  `)}` : ''}`);
+      ok &&= vulns.length === 0;
+    };
+    await check(name, meta.version);
+    for (const dep of Object.keys(meta.dependencies ?? {})) {
+      const d = (await getJson(`https://registry.npmjs.org/${dep.replace('/', '%2F')}/latest`)) as { version: string };
+      await check(dep, d.version, '  ');
+    }
+    console.log(ok ? `→ ok to add: pnpm add ${name}@${meta.version}, then pnpm audit` : '→ do not add');
+    process.exit(ok ? 0 : 1);
+  }
   if (cmd === 'status') {
     // Quiet, cached check for session start: one line per tool.
     for (const tool of ['yt-dlp', 'ffmpeg'] as const) {
@@ -235,7 +260,7 @@ async function main() {
       await fs.rm(TMP, { recursive: true, force: true });
     }
   }
-  console.error('usage: pnpm tools <install|audit|status>');
+  console.error('usage: pnpm tools <install|audit|status|vet>');
   process.exit(2);
 }
 

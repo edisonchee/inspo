@@ -41,6 +41,10 @@ A portable, local-first design-curation workflow and gallery viewer. It holds cl
 - yt-dlp always runs with `YTDLP_SAFE_ARGS`; ffmpeg always with `FFMPEG_INPUT_GUARD` (local mp4/mov/matroska/webm, common video codecs only) and `FFMPEG_TIMEOUT_MS`.
 - ffmpeg CVEs made unreachable by the guard are listed with reasons in `security/ffmpeg-accepted-cves.json`. Adding one needs the user's agreement.
 
+**npm dependencies**: before adding one, run `pnpm tools vet <pkg>[@version]` (OSV.dev, package + direct deps), add it with `--save-exact`, then run `pnpm audit`. Keep dependencies few.
+
+**Editing docs**: use the file tools, not shell heredocs. The privacy guard inspects shell commands and can mistake prose that mentions downloaders for a call.
+
 **Media** is never deleted by the app. Removing a clip or deleting an entry leaves the file unreferenced in `data/media/`, where it can be attached again.
 
 ## Code map
@@ -60,10 +64,12 @@ A portable, local-first design-curation workflow and gallery viewer. It holds cl
   - `entry.ts`: create/update one entry from JSON, moving `incoming/…` files into media.
   - `tools.ts`, `check.ts`.
 - `.claude/`: the skill, settings (permissions + SessionStart tool check + privacy hook), hook script.
+- `schema/`: the `gallery.json` JSON Schema. `security/`: pinned yt-dlp key, accepted ffmpeg CVEs.
+- `ARCHITECTURE.md`: workflow and component diagrams. Keep it in sync when parts move.
 
 ## Data (`data/`)
 
-- `gallery.json` (`schema: design-inspiration/v1`, 2-space JSON):
+- `gallery.json` (`schema: inspo/v1`, 2-space JSON). **The format is defined by `schema/inspo-v1.schema.json`** (JSON Schema 2020-12). `src/lib/validate.ts` checks it with ajv, then checks cross-references in code. Change the format only by changing the schema (a breaking change means `inspo/v2`). Summary:
   - `categories[] {id,name,rule}`: `techniques, components, showpieces, systems, inbox`.
   - `tags[] {tag,facet}`: a controlled vocabulary. Facet is `Component|Technique|Theme|Use`; tags are kebab-case.
   - `entries[] {id,added,category,title,why,tags[],source{label,url},media[{file,type}]}`. `id` is `di-NNN`, never reused, higher = newer. `why` and `media` may be empty.
@@ -81,4 +87,4 @@ A portable, local-first design-curation workflow and gallery viewer. It holds cl
 
 ## Commands
 
-`pnpm dev` (5173) · `pnpm build` · `pnpm preview` (4173) · `pnpm test` · `pnpm check` (validate gallery vs media) · `pnpm tools install|audit|status` · `pnpm ingest <id> [url]` / `pnpm ingest --list` · `pnpm entry put <file.json>`. Set `INSPO_DATA_DIR` to use another data folder.
+`pnpm dev` (5173) · `pnpm build` · `pnpm preview` (4173) · `pnpm test` · `pnpm check` (validate gallery vs media) · `pnpm tools install|audit|status|vet <pkg>` · `pnpm ingest <id> [url]` / `pnpm ingest --list` · `pnpm entry put <file.json>`. Set `INSPO_DATA_DIR` to use another data folder.

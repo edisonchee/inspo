@@ -82,7 +82,7 @@ export interface Audit {
   checkedAt: string;
 }
 
-async function getJson(url: string, init: RequestInit = {}): Promise<unknown> {
+export async function getJson(url: string, init: RequestInit = {}): Promise<unknown> {
   const res = await fetch(url, {
     ...init,
     headers: { 'user-agent': USER_AGENT, ...(init.headers ?? {}) },
@@ -92,12 +92,12 @@ async function getJson(url: string, init: RequestInit = {}): Promise<unknown> {
   return res.json();
 }
 
-/** OSV.dev: advisories for an exact PyPI version. */
-export async function osvVulns(pkg: string, version: string): Promise<string[]> {
+/** OSV.dev: advisories for an exact package version (PyPI for yt-dlp, npm for JS dependencies). */
+export async function osvVulns(pkg: string, version: string, ecosystem: 'PyPI' | 'npm' = 'PyPI'): Promise<string[]> {
   const d = (await getJson('https://api.osv.dev/v1/query', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ version, package: { name: pkg, ecosystem: 'PyPI' } }),
+    body: JSON.stringify({ version, package: { name: pkg, ecosystem } }),
   })) as { vulns?: { id: string; aliases?: string[]; summary?: string }[] };
   return (d.vulns ?? []).map((v) => `${[v.id, ...(v.aliases ?? [])].join(' / ')}: ${v.summary ?? ''}`.trim());
 }

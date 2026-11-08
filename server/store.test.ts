@@ -17,7 +17,7 @@ beforeEach(() => {
   mkdirSync(path.join(dir, 'media'));
   writeFileSync(path.join(dir, 'media', 'di-001-a.png'), 'png');
   writeFileSync(path.join(dir, 'gallery.json'), JSON.stringify({
-    schema: 'design-inspiration/v1', exported: '2026-11-08', next_id: 'di-002', extra: 'keep-me',
+    schema: 'inspo/v1', exported: '2026-11-08', next_id: 'di-002', extra: 'keep-me',
     categories: [{ id: 'techniques', name: 'T', rule: '' }, { id: 'inbox', name: 'I', rule: '' }],
     tags: [{ tag: 'css', facet: 'Technique' }],
     entries: [{ id: 'di-001', added: '2026-01-01', category: 'techniques', title: 'A',

@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:inspo:gallery:v1",
+  "title": "Inspo gallery (inspo/v1)",
+  "description": "data/gallery.json: a curated collection of design inspiration. Paths are relative to the data folder. Unknown properties are allowed and must be preserved by writers. Cross-references (entry tags exist in `tags`, entry categories exist in `categories`, IDs are unique and below `next_id`, media files exist and belong to one entry) are checked by the application, not by this schema.",
+  "type": "object",
+  "required": ["schema", "next_id", "categories", "tags", "entries"],
+  "properties": {
+    "schema": {
+      "const": "inspo/v1",
+      "description": "Format identifier."
+    },
+    "next_id": {
+      "$ref": "#/$defs/id",
+      "description": "The next free entry ID; above every existing ID."
+    },
+    "source_doc": {
+      "type": "string",
+      "pattern": "^https?://\\S+$",
+      "description": "Link to the capture document."
+    },
+    "exported": {
+      "$ref": "#/$defs/date",
+      "description": "Date the file was first exported."
+    },
+    "categories": {
+      "type": "array",
+      "description": "Categories in display order.",
+      "items": { "$ref": "#/$defs/category" }
+    },
+    "tags": {
+      "type": "array",
+      "description": "The controlled tag vocabulary.",
+      "items": { "$ref": "#/$defs/tag" }
+    },
+    "entries": {
+      "type": "array",
+      "description": "Entries, newest (highest ID) first.",
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^di-[0-9]{3,}$",
+      "description": "Entry ID: `di-` plus at least three digits. Never reused."
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "description": "Calendar date, YYYY-MM-DD."
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "Lowercase kebab-case."
+    },
+    "category": {
+      "type": "object",
+      "required": ["id", "name", "rule"],
+      "properties": {
+        "id": { "$ref": "#/$defs/slug", "description": "Stable key used by entries." },
+        "name": { "type": "string", "minLength": 1, "description": "Display name." },
+        "rule": { "type": "string", "description": "One line on what belongs in this category." }
+      }
+    },
+    "tag": {
+      "type": "object",
+      "required": ["tag", "facet"],
+      "properties": {
+        "tag": { "$ref": "#/$defs/slug" },
+        "facet": {
+          "enum": ["Component", "Technique", "Theme", "Use"],
+          "description": "Group used by the tag filter."
+        }
+      }
+    },
+    "media": {
+      "type": "object",
+      "required": ["file", "type"],
+      "properties": {
+        "file": {
+          "type": "string",
+          "pattern": "^media/[^/]+$",
+          "description": "Path relative to the data folder, e.g. media/di-041-slug.mp4."
+        },
+        "type": { "enum": ["video", "image"] }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "required": ["id", "added", "category", "title", "why", "tags", "source", "media"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "added": { "$ref": "#/$defs/date" },
+        "category": { "$ref": "#/$defs/slug", "description": "A category id." },
+        "title": { "type": "string", "pattern": "\\S", "description": "Short name for the idea; not blank." },
+        "why": { "type": "string", "description": "Why it's worth keeping; may be empty (e.g. in an inbox)." },
+        "tags": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/slug" },
+          "uniqueItems": true,
+          "description": "Tags from the vocabulary."
+        },
+        "source": {
+          "type": "object",
+          "required": ["label", "url"],
+          "properties": {
+            "label": { "type": "string", "description": "e.g. `someone on X` or a domain." },
+            "url": { "type": "string", "pattern": "^(https?://\\S+)?$", "description": "http(s) URL, or empty." }
+          }
+        },
+        "media": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/media" },
+          "description": "Ordered clips and images; empty for a link-only entry."
+        }
+      }
+    }
+  }
+}
